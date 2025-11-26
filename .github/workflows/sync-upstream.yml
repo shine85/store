@@ -1,0 +1,85 @@
+name: Sync with Upstream
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每6小时执行一次
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 获取完整历史记录
+          token: ${{ secrets.SYNC_PAT }}  # 使用个人访问令牌
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+      
+      - name: Add Upstream Repository
+        run: |
+          git remote add upstream https://github.com/wukongdaily/store.git
+          git fetch upstream
+      
+      - name: Create Backup Branch of Current State
+        run: |
+          current_date=$(date +"%Y%m%d%H%M%S")
+          git checkout -b backup-$current_date
+          git push origin backup-$current_date
+
+      - name: Handle Custom Files
+        run: |
+          # 备份您的自定义文件
+          mkdir -p /tmp/custom-backup
+          
+          # 列出您需要保留的自定义文件/目录
+          # 示例：如果您修改了特定目录或文件
+          if [ -d "custom" ]; then
+            cp -r custom /tmp/custom-backup/
+          fi
+          
+          # 添加其他您需要保留的文件
+          for file in README.md custom-config.json; do
+            if [ -f "$file" ]; then
+              cp "$file" /tmp/custom-backup/
+            fi
+          done
+
+      - name: Sync with Upstream (Strategy 1: Rebase)
+        run: |
+          # 尝试 rebase 到上游的最新代码
+          git checkout main
+          
+          # 尝试 rebase，如果失败则回退
+          if git rebase upstream/main; then
+            echo "Rebase successful"
+          else
+            git rebase --abort
+            
+            # 尝试替代方法: 合并
+            git merge --no-commit upstream/main
+            
+            # 恢复您的自定义文件
+            if [ -d "/tmp/custom-backup/custom" ]; then
+              cp -r /tmp/custom-backup/custom ./
+            fi
+            
+            # 恢复其他自定义文件
+            for file in /tmp/custom-backup/*; do
+              if [ -f "$file" ]; then
+                cp "$file" ./
+              fi
+            done
+            
+            git add .
+            git commit -m "Merge upstream changes and restore custom files"
+          fi
+
+      - name: Push Changes
+        run: |
+          git push origin main
