@@ -1,49 +1,122 @@
-# 工作流名称
-name: Sync with Upstream (wukongdaily/store)
+name: Sync with Upstream and Report
 
 on:
-  # 1. 定时触发：每小时的第0分钟执行一次。
   schedule:
     - cron: '0 * * * *'
-  
-  # 2. 手动触发：允许你在 Actions 页面手动运行
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # 第 1 步：检出你自己的仓库代码
-      # 使用你配置的 PAT，这样后续才有权限推送
       - name: Checkout your repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT }}
-          ref: master  # <-- 修改点 1：确保检出的是 master 分支
+          ref: master # 你的分支
+          fetch-depth: 0 # 获取所有历史记录，以便比较
 
-      # 第 2 步：配置 Git 用户信息
       - name: Configure Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      # 第 3 步：添加上游仓库作为远程源
       - name: Add upstream remote
         run: git remote add upstream https://github.com/wukongdaily/store.git
 
-      # 第 4 步：从上游仓库拉取最新内容
-      - name: Fetch from upstream
+      - name: Fetch upstream
         run: git fetch upstream
 
-      # 第 5 步：合并上游的 master 分支到你的 master 分支
-      - name: Merge upstream/master into your master
+      # 1. 检查上游是否有新的提交
+      - name: Check for new commits
+        id: check_diff
         run: |
-          # 使用 -X theirs 策略：
-          # - 如果没有冲突，正常合并。
-          # - 如果存在冲突，自动采用上游（theirs）的版本来解决冲突。
-          # - --allow-unrelated-histories 避免因历史不相关导致合并失败。
-          git merge -X theirs upstream/master --allow-unrelated-histories -m "chore: auto-sync from wukongdaily/store"
+          # 比较你的 master 和上游的 master，看看有多少个新提交
+          COMMIT_COUNT=$(git rev-list --count master..upstream/master)
+          if [ "$COMMIT_COUNT" -gt 0 ]; then
+            echo "has_new_commits=true" >> $GITHUB_ENV
+            echo "commit_count=$COMMIT_COUNT" >> $GITHUB_ENV
+            echo "New commits found: $COMMIT_COUNT"
+          else
+            echo "has_new_commits=false" >> $GITHUB_ENV
+            echo "No new commits from upstream. Nothing to do."
+          fi
+
+      # 2. 模拟合并以检测冲突 (仅在有新提交时运行)
+      - name: Detect conflicts (dry run)
+        if: env.has_new_commits == 'true'
+        id: detect_conflicts
+        run: |
+          # 尝试合并，但不自动提交。如果失败（有冲突），git会返回非0状态码
+          # '|| true' 确保即使合并冲突，工作流也不会在这里停止
+          git merge upstream/master --no-commit --no-ff || true
           
-      # 第 6 步：将合并后的内容推送到你的仓库
-      - name: Push changes to your repository
-        run: git push origin master
+          # 查找状态为'UU'（both modified）的文件，这些就是冲突文件
+          CONFLICTED_FILES=$(git status --porcelain | grep "^UU" | awk '{print $2}')
+          
+          if [ -n "$CONFLICTED_FILES" ]; then
+            echo "conflict_files<<EOF" >> $GITHUB_OUTPUT
+            echo "$CONFLICTED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "conflict_files=none" >> $GITHUB_OUTPUT
+          fi
+          
+          # 必须中止这次试探性合并，以清理工作区
+          git merge --abort
+          echo "Conflict detection complete."
+
+      # 3. 记录将要合并的上游提交信息 (仅在有新提交时运行)
+      - name: Get upstream commit log
+        if: env.has_new_commits == 'true'
+        id: get_log
+        run: |
+          LOG_MESSAGE=$(git log --pretty=format:'* %h - %s (%an)' master..upstream/master)
+          echo "log_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # 4. 正式合并与推送 (仅在有新提交时运行)
+      - name: Merge and Push
+        if: env.has_new_commits == 'true'
+        run: |
+          git merge -X theirs upstream/master --allow-unrelated-histories -m "chore: auto-sync from wukongdaily/store"
+          git push origin master
+
+      # 5. 创建报告并发布为 Issue (仅在有新提交时运行)
+      - name: Create Sync Report Issue
+        if: env.has_new_commits == 'true'
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          token: ${{ secrets.PAT }}
+          title: "🤖 上游同步报告 (wukongdaily/store)"
+          content-filepath: ./sync-report.md # 将要创建的报告文件名
+          labels: "automated-sync" # 给 Issue 打上标签，方便过滤
+          
+      # 准备报告文件内容 (仅在有新提交时运行)
+      - name: Prepare Report Content
+        if: env.has_new_commits == 'true'
+        run: |
+          echo "### 自动同步完成 ✅" > ./sync-report.md
+          echo "" >> ./sync-report.md
+          echo "**${{ env.commit_count }}** 个新提交已从 \`wukongdaily/store\` 同步至你的仓库。" >> ./sync-report.md
+          echo "" >> ./sync-report.md
+          echo "---" >> ./sync-report.md
+          echo "" >> ./sync-report.md
+          echo "#### 详细提交记录：" >> ./sync-report.md
+          echo "\`\`\`" >> ./sync-report.md
+          echo "${{ steps.get_log.outputs.log_message }}" >> ./sync-report.md
+          echo "\`\`\`" >> ./sync-report.md
+          echo "" >> ./sync-report.md
+          
+          if [ "${{ steps.detect_conflicts.outputs.conflict_files }}" != "none" ]; then
+            echo "### ⚠️ 冲突警告" >> ./sync-report.md
+            echo "以下文件发生了冲突，并已自动采用 **上游版本** 覆盖了你的修改：" >> ./sync-report.md
+            echo "\`\`\`" >> ./sync-report.md
+            echo "${{ steps.detect_conflicts.outputs.conflict_files }}" >> ./sync-report.md
+            echo "\`\`\`" >> ./sync-report.md
+            echo "> **请注意**: 你在这些文件中的本地修改可能已经丢失，请检查确认。" >> ./sync-report.md
+          else
+            echo "### ✅ 无冲突" >> ./sync-report.md
+            echo "所有上游更新已顺利合并，未检测到与你的修改有冲突。" >> ./sync-report.md
+          fi
