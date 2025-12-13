@@ -43,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT }}  # 使用你在 Repository secrets 中存储的 PAT token
         run: |
           # 使用 GitHub CLI 删除7天前的所有工作流记录
-          WORKFLOWS=$(gh run list --limit 100 --json createdAt,id --jq '.[] | select(.createdAt < "2025-12-06T00:00:00Z") | .id')
+          WORKFLOWS=$(gh run list --limit 100 --json createdAt,databaseId --jq '.[] | select(.createdAt < "2025-12-06T00:00:00Z") | .databaseId')
           for WF in $WORKFLOWS; do
             gh run delete $WF --confirm
           done
