@@ -40,7 +40,7 @@ jobs:
       # 清理7天前的工作流记录
       - name: Clean up workflows older than 7 days
         env:
-          GH_TOKEN: ${{ github.token }}  # 设置 GH_TOKEN 环境变量
+          GH_TOKEN: ${{ secrets.PAT }}  # 使用你在 Repository secrets 中存储的 PAT token
         run: |
           # 使用 GitHub CLI 删除7天前的所有工作流记录
           WORKFLOWS=$(gh run list --limit 100 --json createdAt,id --jq '.[] | select(.createdAt < "2025-12-06T00:00:00Z") | .id')
