@@ -38,7 +38,7 @@ jobs:
         run: git fetch upstream
 
       # 清理7天前的工作流记录
-      - name: Clean up workflows older than 7 days
+      - name: Clean up workflows older than 1 days
         env:
           GH_TOKEN: ${{ secrets.PAT }}  # 使用你在 Repository secrets 中存储的 PAT token
         run: |
@@ -46,7 +46,7 @@ jobs:
           echo "Current date: $(date)"
 
           # 设置时间为7天前的日期
-          SEVEN_DAYS_AGO=$(date -d "7 days ago" --utc +%Y-%m-%dT%H:%M:%SZ)
+          SEVEN_DAYS_AGO=$(date -d "1 days ago" --utc +%Y-%m-%dT%H:%M:%SZ)
           echo "7 days ago date: $SEVEN_DAYS_AGO"
 
           # 使用 GitHub CLI 获取工作流列表，筛选出7天前的工作流
