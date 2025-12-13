@@ -2,73 +2,36 @@ name: Sync with Upstream and Report
 
 on:
   schedule:
-    - cron: '0 0 */3 * *'  # 每3天运行一次
+    - cron: '0 0 */3 * *'
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # 检出仓库
       - name: Checkout your repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT }}
-          ref: master  # 你的分支
-          fetch-depth: 0  # 获取所有历史记录，以便比较
+          ref: master # 你的分支
+          fetch-depth: 0 # 获取所有历史记录，以便比较
 
-      # 安装 GitHub CLI (gh)
-      - name: Install GitHub CLI
-        run: |
-          sudo apt update
-          sudo apt install gh
-
-      # 配置 Git 用户
       - name: Configure Git
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-      # 添加上游远程仓库
       - name: Add upstream remote
         run: git remote add upstream https://github.com/wukongdaily/store.git
 
-      # 获取上游仓库更新
       - name: Fetch upstream
         run: git fetch upstream
 
-      # 清理7天前的工作流记录
-      - name: Clean up workflows older than 1 days
-        env:
-          GH_TOKEN: ${{ secrets.PAT }}  # 使用你在 Repository secrets 中存储的 PAT token
-        run: |
-          # 打印当前时间，用于调试
-          echo "Current date: $(date)"
-
-          # 设置时间为7天前的日期
-          SEVEN_DAYS_AGO=$(date -d "1 days ago" --utc +%Y-%m-%dT%H:%M:%SZ)
-          echo "7 days ago date: $SEVEN_DAYS_AGO"
-
-          # 使用 GitHub CLI 获取工作流列表，筛选出7天前的工作流
-          WORKFLOWS=$(gh run list --limit 200 --json createdAt,databaseId --jq ".[] | {createdAt, databaseId} | select(.createdAt < \"$SEVEN_DAYS_AGO\")")
-
-          # 打印查询到的工作流详细信息，用于调试
-          echo "Found workflows to delete: $WORKFLOWS"
-
-          # 删除查询到的工作流
-          if [ -n "$WORKFLOWS" ]; then
-            for WF in $(echo "$WORKFLOWS" | jq -r '.[].databaseId'); do
-              echo "Deleting workflow with ID: $WF"
-              gh run delete $WF --confirm
-            done
-          else
-            echo "No workflows older than 7 days found to delete."
-          fi
-
-      # 检查上游是否有新的提交
+      # 1. 检查上游是否有新的提交
       - name: Check for new commits
         id: check_diff
         run: |
+          # 比较你的 master 和上游的 master，看看有多少个新提交
           COMMIT_COUNT=$(git rev-list --count master..upstream/master)
           if [ "$COMMIT_COUNT" -gt 0 ]; then
             echo "has_new_commits=true" >> $GITHUB_ENV
@@ -79,13 +42,18 @@ jobs:
             echo "No new commits from upstream. Nothing to do."
           fi
 
-      # 模拟合并以检测冲突 (仅在有新提交时运行)
+      # 2. 模拟合并以检测冲突 (仅在有新提交时运行)
       - name: Detect conflicts (dry run)
         if: env.has_new_commits == 'true'
         id: detect_conflicts
         run: |
+          # 尝试合并，但不自动提交。如果失败（有冲突），git会返回非0状态码
+          # '|| true' 确保即使合并冲突，工作流也不会在这里停止
           git merge upstream/master --no-commit --no-ff || true
+          
+          # 查找状态为'UU'（both modified）的文件，这些就是冲突文件
           CONFLICTED_FILES=$(git status --porcelain | grep "^UU" | awk '{print $2}')
+          
           if [ -n "$CONFLICTED_FILES" ]; then
             echo "conflict_files<<EOF" >> $GITHUB_OUTPUT
             echo "$CONFLICTED_FILES" >> $GITHUB_OUTPUT
@@ -93,9 +61,12 @@ jobs:
           else
             echo "conflict_files=none" >> $GITHUB_OUTPUT
           fi
+          
+          # 必须中止这次试探性合并，以清理工作区
           git merge --abort
+          echo "Conflict detection complete."
 
-      # 记录将要合并的上游提交信息 (仅在有新提交时运行)
+      # 3. 记录将要合并的上游提交信息 (仅在有新提交时运行)
       - name: Get upstream commit log
         if: env.has_new_commits == 'true'
         id: get_log
@@ -105,23 +76,23 @@ jobs:
           echo "$LOG_MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # 正式合并与推送 (仅在有新提交时运行)
+      # 4. 正式合并与推送 (仅在有新提交时运行)
       - name: Merge and Push
         if: env.has_new_commits == 'true'
         run: |
           git merge -X theirs upstream/master --allow-unrelated-histories -m "chore: auto-sync from wukongdaily/store"
           git push origin master
 
-      # 创建报告并发布为 Issue (仅在有新提交时运行)
+      # 5. 创建报告并发布为 Issue (仅在有新提交时运行)
       - name: Create Sync Report Issue
         if: env.has_new_commits == 'true'
         uses: peter-evans/create-issue-from-file@v5
         with:
           token: ${{ secrets.PAT }}
           title: "🤖 上游同步报告 (wukongdaily/store)"
-          content-filepath: ./sync-report.md
-          labels: "automated-sync"
-
+          content-filepath: ./sync-report.md # 将要创建的报告文件名
+          labels: "automated-sync" # 给 Issue 打上标签，方便过滤
+          
       # 准备报告文件内容 (仅在有新提交时运行)
       - name: Prepare Report Content
         if: env.has_new_commits == 'true'

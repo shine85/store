@@ -4,9 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       keep_days:
-        description: "保留最近多少天（默认 1）"
+        description: "保留最近多少天（默认 3）"
         required: false
-        default: "1"
+        default: "3"
+  schedule:
+    - cron: '0 0 */5 * *'  # 每5天运行一次
 
 jobs:
   cleanup:
