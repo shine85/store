@@ -50,7 +50,7 @@ jobs:
           echo "7 days ago date: $SEVEN_DAYS_AGO"
 
           # 使用 GitHub CLI 获取工作流列表，筛选出7天前的工作流
-          WORKFLOWS=$(gh run list --limit 100 --json createdAt,databaseId --jq ".[] | {createdAt, databaseId} | select(.createdAt < \"$SEVEN_DAYS_AGO\")")
+          WORKFLOWS=$(gh run list --limit 200 --json createdAt,databaseId --jq ".[] | {createdAt, databaseId} | select(.createdAt < \"$SEVEN_DAYS_AGO\")")
 
           # 打印查询到的工作流详细信息，用于调试
           echo "Found workflows to delete: $WORKFLOWS"
