@@ -28,6 +28,8 @@
 | luci-app-unishare             | 统一文件共享 | webdav共享                      |
 | luci-app-uninstall             | 高级卸载1.1.8 | [用于彻底卸载插件 点这里出处](https://www.bilibili.com/video/BV1dK1xBVEHF)                     |
 | luci-theme-aurora      | 极光主题 0.9                 | [eamonxg/luci-theme-aurora](https://github.com/eamonxg/luci-theme-aurora)                 |
+| luci-app-bandix      | Bandix流量监控 0.11                 | [timsaya/luci-app-bandix](https://github.com/timsaya/luci-app-bandix)                 |
+
 ## 如何集成到AutoBuildImmortalWrt
 https://github.com/wukongdaily/AutoBuildImmortalWrt/discussions/209
 ## ❤️其它GitHub Action项目推荐🌟 （建议收藏）⬇️
