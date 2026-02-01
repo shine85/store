@@ -18,7 +18,7 @@
 | luci-app-nekobox               | 代理工具      | [Thaolga/luci-app-nekobox](https://github.com/Thaolga/openwrt-nekobox)       |
 | luci-app-nikki                 | 代理工具               | [nikkinikki-org/nikki](https://github.com/nikkinikki-org/OpenWrt-momo)                                                                     |
 | luci-app-momo                 | 代理工具               | [nikkinikki-org/momo](https://github.com/nikkinikki-org/OpenWrt-momo)                                                                     |
-| luci-app-passwall2             | 代理工具           | [xiaorouji/openwrt-passwall2](https://github.com/xiaorouji/openwrt-passwall2)       |
+| luci-app-passwall2             | 代理工具           | [Openwrt-Passwall/openwrt-passwall2](https://github.com/Openwrt-Passwall/openwrt-passwall2)       |
 | luci-app-ssr-plus              | 代理工具                | [coolsnowwolf/luci-app-ssr-plus](https://github.com/fw876/helloworld) |
 | tailscale             | ZeroTier 类似的 VPN 工具，基于 WireGuard | [tailscale/tailscale](https://github.com/tailscale/tailscale)                       |
 | luci-app-lucky           | Lucky大吉,软硬路由公网神器,ipv6/ipv4 端口转发,反向代理 | [程序 gdy666/lucky](https://github.com/gdy666/lucky) [ipk仓库](https://dl.openwrt.ai/packages-24.10/aarch64_cortex-a53/kiddin9/)                      |
@@ -39,4 +39,4 @@ https://github.com/wukongdaily/AutoBuildImmortalWrt/discussions/209
 - ### [一键生成docker离线镜像] 🆕
 - https://github.com/wukongdaily/DockerTarBuilder<br>
 - ### [OpenWrt/Armbian IMG安装器ISO] 🆕
-- https://github.com/wukongdaily/armbian-installer
+- https://github.com/wukongdaily/img-installer
