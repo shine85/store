@@ -11,6 +11,7 @@
 | luci-app-netspeedtest | 网络测速插件-支持 Speedtest 测试           | [sirpdboy/luci-app-netspeedtest](https://github.com/sirpdboy/luci-app-netspeedtest)  |
 | luci-app-netwizard    | 网络配置向导插件                          | [sirpdboy/luci-app-netwizard](https://github.com/sirpdboy/luci-app-netwizard)                                                                 |
 | luci-app-partexp      | 分区扩容插件         | [sirpdboy/luci-app-partexp](https://github.com/sirpdboy/luci-app-partexp)                             |
+| luci-app-watchdog      |  openwrt看门狗                 | [sirpdboy/luci-app-watchdog](https://github.com/sirpdboy/luci-app-watchdog)                 |
 | luci-app-quickstart   | iStore首页和网络向导                  | [linkease/luci-app-quickstart](https://github.com/kiddin9/kwrt-packages/tree/main/luci-app-quickstart)                                                                 |
 | luci-app-turboacc     | TurboACC 网络加速器（集成BBR、shortcut）   | [chenmozhijin/turboacc](https://github.com/wukongdaily/store/tree/master/run/x86/luci-app-turboacc) |
 | luci-theme-kucat      | 酷猫主题                  | [sirpdboy/luci-theme-kucat](https://github.com/sirpdboy/luci-theme-kucat)                 |
