@@ -28,7 +28,7 @@
 | luci-app-gecoosac           | 集客AC                | [lwb1978/openwrt-gecoosac](https://github.com/lwb1978/openwrt-gecoosac) |
 | luci-app-easytier             | 组网 | https://github.com/EasyTier/luci-app-easytier                       |
 | luci-app-uninstall             | 高级卸载1.1.8 | [用于彻底卸载插件 点这里出处](https://www.bilibili.com/video/BV1dK1xBVEHF)                     |
-| luci-theme-aurora      | 极光主题 0.9                 | [eamonxg/luci-theme-aurora](https://github.com/eamonxg/luci-theme-aurora)                 |
+| luci-theme-aurora      | 极光主题 0.11                 | [eamonxg/luci-theme-aurora](https://github.com/eamonxg/luci-theme-aurora)                 |
 | luci-app-bandix      | Bandix流量监控 0.11                 | [timsaya/luci-app-bandix](https://github.com/timsaya/luci-app-bandix)                 |
 | luci-app-rtp2httpd      |  IPTV 流媒体转发服务器                 | [stackia/rtp2httpd](https://github.com/stackia/rtp2httpd)                 |
 
