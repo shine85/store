@@ -1,5 +1,5 @@
 # store
-此项目用于存储 [AutoBuildImmortalWrt](https://github.com/wukongdaily/AutoBuildImmortalWrt/) 仓库以外的第三方软件包。
+此项目用于存储 [ImmortalWrt-ImageBuilder](https://github.com/wukongdaily/ImmortalWrt-ImageBuilder) 仓库以外的第三方软件包。
 本仓库的 IPK 文件来自多个项目，版权归原作者，见 README 列表。
 
 
@@ -23,6 +23,7 @@
 | luci-app-momo                 | 代理工具               | [nikkinikki-org/momo](https://github.com/nikkinikki-org/OpenWrt-momo)                                                                     |
 | luci-app-passwall2             | 代理工具           | [Openwrt-Passwall/openwrt-passwall2](https://github.com/Openwrt-Passwall/openwrt-passwall2)       |
 | luci-app-ssr-plus              | 代理工具                | [coolsnowwolf/luci-app-ssr-plus](https://github.com/fw876/helloworld) |
+| clashoo              | 代理工具                | [kenzok8/openwrt-clashoo](https://github.com/kenzok8/openwrt-clashoo) |
 | tailscale             | ZeroTier 类似的 VPN 工具，基于 WireGuard | [tailscale/tailscale](https://github.com/tailscale/tailscale)                       |
 | luci-app-lucky           | Lucky大吉,软硬路由公网神器,ipv6/ipv4 端口转发,反向代理 | [程序 gdy666/lucky](https://github.com/gdy666/lucky) [ipk仓库](https://dl.openwrt.ai/packages-24.10/aarch64_cortex-a53/kiddin9/)                      |
 | luci-app-gecoosac           | 集客AC                | [lwb1978/openwrt-gecoosac](https://github.com/lwb1978/openwrt-gecoosac) |
@@ -31,6 +32,8 @@
 | luci-theme-aurora      | 极光主题 0.11                 | [eamonxg/luci-theme-aurora](https://github.com/eamonxg/luci-theme-aurora)                 |
 | luci-app-bandix      | Bandix流量监控 0.11                 | [timsaya/luci-app-bandix](https://github.com/timsaya/luci-app-bandix)                 |
 | luci-app-rtp2httpd      |  IPTV 流媒体转发服务器                 | [stackia/rtp2httpd](https://github.com/stackia/rtp2httpd)                 |
+| luci-app-tailscale-community      |  Tailscale (Community)                 | [Tokisaki-Galaxy/luci-app-tailscale-community](https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community)                 |
+| luci-app-quickfile      |  轻量级 OpenWrt/LuCI 网页文件管理器                 | [sbwml/luci-app-quickfile](https://github.com/sbwml/luci-app-quickfile)                 |
 
 ## 如何集成到AutoBuildImmortalWrt
 https://github.com/wukongdaily/AutoBuildImmortalWrt/discussions/209
@@ -41,3 +44,6 @@ https://github.com/wukongdaily/AutoBuildImmortalWrt/discussions/209
 - https://github.com/wukongdaily/DockerTarBuilder<br>
 - ### [OpenWrt/Armbian IMG安装器ISO] 🆕
 - https://github.com/wukongdaily/img-installer
+
+## 25.12.x 相关仓库
+[25.12.x 相关仓库 ](https://github.com/wukongdaily/apk)
