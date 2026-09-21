@@ -1,6 +1,7 @@
 "use strict";
 
-// 用 CloudRunFilesBuilder 每日构建覆盖已有 .run；24/25 前缀不混用，不自动新增仓库里没有的插件。
+// 用 CloudRunFilesBuilder 每日构建同步 .run：已有的覆盖，没有的新增。
+// 跳过 25 前缀和 aarch32，避免混进 25.12 线或 32 位包。
 
 const fs = require("fs");
 const path = require("path");
@@ -109,24 +110,112 @@ function pickRemoteAsset(local, assets) {
   return candidates[0].filename;
 }
 
-function planRefresh({ filesByDir, assets }) {
+function targetDirs(archClass, filesByDir) {
+  const keys = Object.keys(filesByDir);
+  const arm = keys.find((key) => /arm64$/i.test(key)) || "run/arm64";
+  const x86 = keys.find((key) => /x86$/i.test(key)) || "run/x86";
+  if (archClass === "arm64") {
+    return [arm];
+  }
+  if (archClass === "x86") {
+    return [x86];
+  }
+  if (archClass === "all") {
+    return [arm, x86];
+  }
+  return [];
+}
+
+function preferredPrefix(items) {
+  if (items.some((item) => item.prefix === "")) {
+    return "";
+  }
+  if (items.some((item) => item.prefix === "24")) {
+    return "24";
+  }
+  return null;
+}
+
+function planRefresh({ filesByDir, assets, addMissing = true }) {
   const planMap = new Map();
+
+  const addItem = (dir, to, fromName) => {
+    const key = `${dir}\0${to}`;
+    if (!planMap.has(key)) {
+      planMap.set(key, { dir, to, from: [] });
+    }
+    const item = planMap.get(key);
+    if (fromName && !item.from.includes(fromName)) {
+      item.from.push(fromName);
+    }
+  };
+
+  const present = new Set();
   for (const [dir, files] of Object.entries(filesByDir)) {
     for (const filename of files) {
+      const parsed = parseRunName(filename);
+      present.add(`${parsed.family}\0${dir}`);
       const remote = pickRemoteAsset(filename, assets);
       if (!remote || remote === filename) {
         continue;
       }
-      const key = `${dir}\0${remote}`;
-      if (!planMap.has(key)) {
-        planMap.set(key, { dir, to: remote, from: [] });
+      addItem(dir, remote, filename);
+    }
+  }
+
+  if (addMissing) {
+    const grouped = new Map();
+    for (const name of assets) {
+      const parsed = parseRunName(name);
+      if (parsed.archClass === "arm32" || parsed.prefix === "25") {
+        continue;
       }
-      const item = planMap.get(key);
-      if (!item.from.includes(filename)) {
-        item.from.push(filename);
+      const key = `${parsed.family}\0${parsed.archClass}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key).push(parsed);
+    }
+
+    for (const items of grouped.values()) {
+      const prefix = preferredPrefix(items);
+      if (prefix === null) {
+        continue;
+      }
+      const pool = items.filter((item) => item.prefix === prefix);
+      const sample = pool[0];
+      const preferredFlavor =
+        sample.archClass === "arm64"
+          ? "cortex-a53"
+          : sample.archClass === "x86"
+            ? "x86_64"
+            : "all";
+      const remote = pickRemoteAsset(
+        {
+          family: sample.family,
+          prefix,
+          archClass: sample.archClass,
+          archFlavor: preferredFlavor,
+        },
+        pool.map((item) => item.filename)
+      );
+      if (!remote) {
+        continue;
+      }
+      for (const dir of targetDirs(sample.archClass, filesByDir)) {
+        if (present.has(`${sample.family}\0${dir}`)) {
+          continue;
+        }
+        const existing = filesByDir[dir] || [];
+        if (existing.includes(remote)) {
+          continue;
+        }
+        addItem(dir, remote, null);
+        present.add(`${sample.family}\0${dir}`);
       }
     }
   }
+
   return [...planMap.values()].sort(
     (a, b) => a.dir.localeCompare(b.dir) || a.to.localeCompare(b.to)
   );
@@ -222,13 +311,16 @@ function formatSummary(release, plan, applied) {
     "",
   ];
   if (plan.length === 0) {
-    lines.push("现有 `.run` 已是该 release 中可匹配的最新文件。");
+    lines.push("现有 `.run` 已是该 release 中可同步的最新文件。");
     return lines.join("\n");
   }
   lines.push("| 目录 | 旧文件 | 新文件 |");
   lines.push("| --- | --- | --- |");
   for (const item of plan) {
-    lines.push(`| \`${item.dir}\` | ${item.from.map((name) => `\`${name}\``).join("<br>")} | \`${item.to}\` |`);
+    const from = item.from.length
+      ? item.from.map((name) => `\`${name}\``).join("<br>")
+      : "（新增）";
+    lines.push(`| \`${item.dir}\` | ${from} | \`${item.to}\` |`);
   }
   return lines.join("\n");
 }

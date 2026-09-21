@@ -154,6 +154,7 @@ test("pickRemoteAsset keeps 24/25 prefix class and arch", () => {
 
 test("planRefresh replaces old run files and collapses aliases", () => {
   const plan = planRefresh({
+    addMissing: false,
     filesByDir: {
       "run/arm64": [
         "AdGuardHome_v0.107.69_aarch64.run",
@@ -197,6 +198,7 @@ test("planRefresh replaces old run files and collapses aliases", () => {
   );
 
   const alreadyLatest = planRefresh({
+    addMissing: false,
     filesByDir: {
       "run/x86": ["AdGuardHome_v0.107.79_x86_64.run"],
     },
@@ -207,6 +209,7 @@ test("planRefresh replaces old run files and collapses aliases", () => {
 
 test("planRefresh collapses old ssrp and ssrp_mihomo into one latest file", () => {
   const plan = planRefresh({
+    addMissing: false,
     filesByDir: {
       "run/x86": [
         "ssrp_x86_64-190-r117.run",
@@ -221,4 +224,29 @@ test("planRefresh collapses old ssrp and ssrp_mihomo into one latest file", () =
     "ssrp_mihomo_x86_64-196_r2.run",
     "ssrp_x86_64-190-r117.run",
   ]);
+});
+
+test("planRefresh adds missing daily-build plugins", () => {
+  const plan = planRefresh({
+    filesByDir: {
+      "run/arm64": ["AdGuardHome_v0.107.79_aarch64.run"],
+      "run/x86": ["AdGuardHome_v0.107.79_x86_64.run"],
+    },
+    assets: REMOTE_ASSETS,
+  });
+  const arm64New = plan
+    .filter((item) => item.dir === "run/arm64" && item.from.length === 0)
+    .map((item) => item.to);
+  const x86New = plan
+    .filter((item) => item.dir === "run/x86" && item.from.length === 0)
+    .map((item) => item.to);
+  assert.ok(arm64New.includes("openclash-aarch64_cortex-a53-v0.47.156.run"));
+  assert.ok(arm64New.includes("dufs-0.46.0-r1_aarch64_cortex-a53.run"));
+  assert.ok(arm64New.includes("nikki_v1.26.1_aarch64_cortex-a53.run"));
+  assert.ok(arm64New.includes("24_quickfile_1.0.16_aarch64_cortex-a53.run"));
+  assert.ok(x86New.includes("openclash-x86-64-v0.47.156.run"));
+  assert.ok(x86New.includes("argon-2.4.3-r20250722_x86_64.run"));
+  assert.equal(plan.some((item) => item.to.startsWith("25-") || item.to.startsWith("25_")), false);
+  assert.equal(plan.some((item) => /aarch32/i.test(item.to)), false);
+  assert.equal(plan.some((item) => item.to.startsWith("AdGuardHome") && item.from.length > 0), false);
 });
