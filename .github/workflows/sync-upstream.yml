@@ -1,122 +1,100 @@
-name: Sync with Upstream and Report
+name: Sync Upstream and Refresh Plugins
 
 on:
   schedule:
-    - cron: '0 0 */3 * *'
+    - cron: "0 2 * * *"
   workflow_dispatch:
+    inputs:
+      skip_upstream:
+        description: "跳过上游同步，只刷新插件"
+        type: boolean
+        default: false
+      skip_plugins:
+        description: "跳过插件刷新，只同步上游"
+        type: boolean
+        default: false
+
+concurrency:
+  group: sync-upstream-and-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT }}
-          ref: master # 你的分支
-          fetch-depth: 0 # 获取所有历史记录，以便比较
+          token: ${{ secrets.PAT != '' && secrets.PAT || github.token }}
+          ref: master
+          fetch-depth: 0
 
       - name: Configure Git
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Add upstream remote
-        run: git remote add upstream https://github.com/wukongdaily/store.git
-
-      - name: Fetch upstream
-        run: git fetch upstream
-
-      # 1. 检查上游是否有新的提交
-      - name: Check for new commits
-        id: check_diff
+      - name: Sync upstream
+        if: ${{ !inputs.skip_upstream }}
+        id: upstream
         run: |
-          # 比较你的 master 和上游的 master，看看有多少个新提交
-          COMMIT_COUNT=$(git rev-list --count master..upstream/master)
-          if [ "$COMMIT_COUNT" -gt 0 ]; then
-            echo "has_new_commits=true" >> $GITHUB_ENV
-            echo "commit_count=$COMMIT_COUNT" >> $GITHUB_ENV
-            echo "New commits found: $COMMIT_COUNT"
-          else
-            echo "has_new_commits=false" >> $GITHUB_ENV
-            echo "No new commits from upstream. Nothing to do."
+          set -euo pipefail
+          git remote add upstream https://github.com/wukongdaily/store.git 2>/dev/null || git remote set-url upstream https://github.com/wukongdaily/store.git
+          git fetch upstream master
+          COMMIT_COUNT="$(git rev-list --count master..upstream/master)"
+          echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+          if [ "$COMMIT_COUNT" -eq 0 ]; then
+            echo "No new upstream commits."
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-
-      # 2. 模拟合并以检测冲突 (仅在有新提交时运行)
-      - name: Detect conflicts (dry run)
-        if: env.has_new_commits == 'true'
-        id: detect_conflicts
-        run: |
-          # 尝试合并，但不自动提交。如果失败（有冲突），git会返回非0状态码
-          # '|| true' 确保即使合并冲突，工作流也不会在这里停止
-          git merge upstream/master --no-commit --no-ff || true
-          
-          # 查找状态为'UU'（both modified）的文件，这些就是冲突文件
-          CONFLICTED_FILES=$(git status --porcelain | grep "^UU" | awk '{print $2}')
-          
-          if [ -n "$CONFLICTED_FILES" ]; then
-            echo "conflict_files<<EOF" >> $GITHUB_OUTPUT
-            echo "$CONFLICTED_FILES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "conflict_files=none" >> $GITHUB_OUTPUT
+          echo "New upstream commits: ${COMMIT_COUNT}"
+          if git merge -X theirs --no-edit -m "chore: auto-sync from wukongdaily/store" upstream/master; then
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          
-          # 必须中止这次试探性合并，以清理工作区
-          git merge --abort
-          echo "Conflict detection complete."
+          echo "Merge reported conflicts, taking upstream for remaining paths."
+          git checkout --theirs -- . || true
+          git add -A
+          git commit --no-edit -m "chore: auto-sync from wukongdaily/store" || true
+          echo "synced=true" >> "$GITHUB_OUTPUT"
+          echo "conflict=true" >> "$GITHUB_OUTPUT"
 
-      # 3. 记录将要合并的上游提交信息 (仅在有新提交时运行)
-      - name: Get upstream commit log
-        if: env.has_new_commits == 'true'
-        id: get_log
-        run: |
-          LOG_MESSAGE=$(git log --pretty=format:'* %h - %s (%an)' master..upstream/master)
-          echo "log_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG_MESSAGE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Run plugin matcher tests
+        if: ${{ !inputs.skip_plugins }}
+        run: node --test scripts/refresh-run-plugins.test.js
 
-      # 4. 正式合并与推送 (仅在有新提交时运行)
-      - name: Merge and Push
-        if: env.has_new_commits == 'true'
-        run: |
-          git merge -X theirs upstream/master --allow-unrelated-histories -m "chore: auto-sync from wukongdaily/store"
-          git push origin master
+      - name: Refresh run plugins
+        if: ${{ !inputs.skip_plugins }}
+        id: refresh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/refresh-run-plugins.js --apply --summary-file "$GITHUB_STEP_SUMMARY"
 
-      # 5. 创建报告并发布为 Issue (仅在有新提交时运行)
-      - name: Create Sync Report Issue
-        if: env.has_new_commits == 'true'
-        uses: peter-evans/create-issue-from-file@v5
-        with:
-          token: ${{ secrets.PAT }}
-          title: "🤖 上游同步报告 (wukongdaily/store)"
-          content-filepath: ./sync-report.md # 将要创建的报告文件名
-          labels: "automated-sync" # 给 Issue 打上标签，方便过滤
-          
-      # 准备报告文件内容 (仅在有新提交时运行)
-      - name: Prepare Report Content
-        if: env.has_new_commits == 'true'
+      - name: Commit plugin refresh
+        if: ${{ !inputs.skip_plugins }}
         run: |
-          echo "### 自动同步完成 ✅" > ./sync-report.md
-          echo "" >> ./sync-report.md
-          echo "**${{ env.commit_count }}** 个新提交已从 \`wukongdaily/store\` 同步至你的仓库。" >> ./sync-report.md
-          echo "" >> ./sync-report.md
-          echo "---" >> ./sync-report.md
-          echo "" >> ./sync-report.md
-          echo "#### 详细提交记录：" >> ./sync-report.md
-          echo "\`\`\`" >> ./sync-report.md
-          echo "${{ steps.get_log.outputs.log_message }}" >> ./sync-report.md
-          echo "\`\`\`" >> ./sync-report.md
-          echo "" >> ./sync-report.md
-          
-          if [ "${{ steps.detect_conflicts.outputs.conflict_files }}" != "none" ]; then
-            echo "### ⚠️ 冲突警告" >> ./sync-report.md
-            echo "以下文件发生了冲突，并已自动采用 **上游版本** 覆盖了你的修改：" >> ./sync-report.md
-            echo "\`\`\`" >> ./sync-report.md
-            echo "${{ steps.detect_conflicts.outputs.conflict_files }}" >> ./sync-report.md
-            echo "\`\`\`" >> ./sync-report.md
-            echo "> **请注意**: 你在这些文件中的本地修改可能已经丢失，请检查确认。" >> ./sync-report.md
-          else
-            echo "### ✅ 无冲突" >> ./sync-report.md
-            echo "所有上游更新已顺利合并，未检测到与你的修改有冲突。" >> ./sync-report.md
+          set -euo pipefail
+          git add run
+          if git diff --cached --quiet; then
+            echo "No plugin file changes."
+            exit 0
           fi
+          TAG="${{ steps.refresh.outputs.release_tag }}"
+          git commit -m "chore: refresh run plugins from CloudRunFilesBuilder ${TAG}"
+
+      - name: Push changes
+        run: |
+          set -euo pipefail
+          AHEAD="$(git rev-list --count origin/master..HEAD)"
+          if [ "$AHEAD" -eq 0 ]; then
+            echo "Nothing to push."
+            exit 0
+          fi
+          git push origin HEAD:master
